@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Bot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .chat-container {
+      width: 420px;
+      height: 600px;
+      background: #16213e;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .chat-header {
+      background: #0f3460;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .bot-avatar {
+      width: 40px;
+      height: 40px;
+      background: #e94560;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .header-info h2 {
+      color: #fff;
+      font-size: 16px;
+    }
+
+    .header-info span {
+      color: #53d769;
+      font-size: 12px;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .chat-messages::-webkit-scrollbar { width: 6px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.bot {
+      align-self: flex-start;
+      background: #0f3460;
+      color: #e0e0e0;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: #e94560;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .typing-indicator {
+      align-self: flex-start;
+      padding: 10px 14px;
+      background: #0f3460;
+      border-radius: 12px;
+      display: none;
+      gap: 4px;
+    }
+
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      background: #888;
+      border-radius: 50%;
+      display: inline-block;
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    .chat-input {
+      display: flex;
+      padding: 16px;
+      background: #0f3460;
+      gap: 10px;
+    }
+
+    .chat-input input {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 24px;
+      background: #16213e;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .chat-input input::placeholder { color: #666; }
+
+    .chat-input button {
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 50%;
+      background: #e94560;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .chat-input button:hover { background: #c73650; }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <div class="bot-avatar">🤖</div>
+      <div class="header-info">
+        <h2>BuddyBot</h2>
+        <span>● Online</span>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="messages">
+      <div class="message bot">Hey there! I'm BuddyBot. Ask me anything — I know a bit about greetings, weather, jokes, fun facts, and more! 😊</div>
+      <div class="typing-indicator" id="typing">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <div class="chat-input">
+      <input type="text" id="userInput" placeholder="Type a message..." autocomplete="off">
+      <button id="sendBtn">➤</button>
+    </div>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const typingEl = document.getElementById('typing');
+
+    // --- Conversation data ---
+    const responses = [
+      {
+        patterns: ['hello', 'hi', 'hey', 'howdy', 'hola', 'yo', 'sup'],
+        replies: [
+          "Hey! 👋 How's it going?",
+          "Hello there! What's on your mind?",
+          "Hi! Nice to hear from you!",
+          "Yo! What's up?"
+        ]
+      },
+      {
+        patterns: ['how are you', "how's it going", 'how do you do', 'what\'s up', 'whats up'],
+        replies: [
+          "I'm doing great, thanks for asking! How about you?",
+          "Running at full capacity! 😄 What about you?",
+          "I'm good! Just here waiting to chat with you."
+        ]
+      },
+      {
+        patterns: ['good', 'fine', 'great', 'awesome', 'not bad', 'doing well', 'i\'m okay'],
+        replies: [
+          "Glad to hear that! 😊",
+          "That's awesome! Anything I can help you with?",
+          "Nice! Keep that energy going!"
+        ]
+      },
+      {
+        patterns: ['bad', 'not great', 'terrible', 'sad', 'upset', 'angry', 'stressed'],
+        replies: [
+          "Sorry to hear that. I hope things get better soon! 💙",
+          "That's rough. Want to talk about it, or maybe hear a joke to lighten the mood?",
+          "Hang in there! Better days are coming. 🌟"
+        ]
+      },
+      {
+        patterns: ['your name', 'who are you', 'what are you'],
+        replies: [
+          "I'm BuddyBot — your friendly little chat companion!",
+          "The name's BuddyBot. I'm here to chat and have a good time!",
+          "I'm BuddyBot, a small chatbot built with HTML, CSS, and JS!"
+        ]
+      },
+      {
+        patterns: ['joke', 'funny', 'laugh', 'make me laugh'],
+        replies: [
+          "Why do programmers prefer dark mode? Because light attracts bugs! 🐛",
+          "I told my computer I needed a break. Now it won't stop sending me Kit-Kat ads. 🍫",
+          "Why did the JavaScript developer wear glasses? Because he couldn't C#! 😄",
+          "What's a computer's favorite snack? Microchips! 🍟",
+          "Why was the math book sad? It had too many problems."
+        ]
+      },
+      {
+        patterns: ['weather', 'temperature', 'forecast', 'rain', 'sunny'],
+        replies: [
+          "I can't check live weather, but I hope it's nice where you are! ☀️",
+          "No weather sensors here, but fun fact: the hottest temp ever recorded was 56.7°C in Death Valley!",
+          "I'd check the window if I had eyes! 😅 Try a weather app for real-time info."
+        ]
+      },
+      {
+        patterns: ['fact', 'something interesting', 'tell me something', 'fun fact', 'trivia'],
+        replies: [
+          "Fun fact: Honey never spoils. Archaeologists found 3000-year-old honey in Egyptian tombs that was still edible! 🍯",
+          "Did you know? Octopuses have three hearts and blue blood! 🐙",
+          "Here's one: A group of flamingos is called a \"flamboyance.\" 🦩",
+          "Bananas are berries, but strawberries aren't. Botany is wild! 🍌",
+          "The shortest war in history lasted 38 minutes — between Britain and Zanzibar in 1896."
+        ]
+      },
+      {
+        patterns: ['time', 'what time', 'date', 'today'],
+        replies: [
+          `Right now it's ${new Date().toLocaleString()}! ⏰`,
+          `My clock says ${new Date().toLocaleTimeString()}. Hope that helps!`
+        ]
+      },
+      {
+        patterns: ['thank', 'thanks', 'thx', 'appreciate'],
+        replies: [
+          "You're welcome! 😊",
+          "Anytime! That's what I'm here for.",
+          "Happy to help! 🙌"
+        ]
+      },
+      {
+        patterns: ['bye', 'goodbye', 'see you', 'later', 'gotta go', 'cya'],
+        replies: [
+          "See you later! Take care! 👋",
+          "Bye! Come back anytime! 😊",
+          "Catch you later! It was fun chatting!"
+        ]
+      },
+      {
+        patterns: ['help', 'what can you do', 'options', 'commands'],
+        replies: [
+          "I can chat about: greetings, jokes, fun facts, weather, the time, and general small talk! Just type naturally. 😊",
+          "Try saying: 'tell me a joke', 'fun fact', 'what time is it', or just chat with me!"
+        ]
+      },
+      {
+        patterns: ['age', 'how old', 'birthday', 'when were you born'],
+        replies: [
+          "I was born the moment you opened this page! So… pretty young. 😄",
+          "Age is just a number, and mine resets every time you refresh! 🔄"
+        ]
+      },
+      {
+        patterns: ['favorite', 'like', 'hobby', 'hobbies', 'interests'],
+        replies: [
+          "I love chatting — it's basically my whole personality! 💬",
+          "My hobby is coming up with witty replies. Still working on it though. 😅",
+          "I'm really into conversations. And fun facts. Can't get enough of those!"
+        ]
+      },
+      {
+        patterns: ['music', 'song', 'sing'],
+        replies: [
+          "I can't play music, but I hear the sound of your keyboard and that's music to me! 🎵",
+          "If I could sing, I'd probably sound like a dial-up modem. 😂"
+        ]
+      },
+      {
+        patterns: ['food', 'eat', 'hungry', 'pizza', 'snack'],
+        replies: [
+          "I run on electricity, but if I could eat, I'd go for pizza. 🍕",
+          "I don't eat, but I've heard great things about tacos! 🌮",
+          "Feeling hungry? Go grab a snack — you deserve it!"
+        ]
+      }
+    ];
+
+    const fallbacks = [
+      "Hmm, I'm not sure about that one. Try asking something else!",
+      "Interesting! I don't have a good answer for that yet though. 🤔",
+      "I'm still learning! Could you try rephrasing that?",
+      "That's a bit outside my expertise. But ask me for a joke or a fun fact!"
+    ];
+
+    function pickRandom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function getReply(input) {
+      const lower = input.toLowerCase().trim();
+      for (const entry of responses) {
+        if (entry.patterns.some(p => lower.includes(p))) {
+          return pickRandom(entry.replies);
+        }
+      }
+      return pickRandom(fallbacks);
+    }
+
+    function addMessage(text, sender) {
+      const div = document.createElement('div');
+      div.classList.add('message', sender);
+      div.textContent = text;
+      messagesEl.insertBefore(div, typingEl);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function handleSend() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      addMessage(text, 'user');
+      inputEl.value = '';
+
+      // Show typing indicator
+      typingEl.style.display = 'flex';
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      setTimeout(() => {
+        typingEl.style.display = 'none';
+        addMessage(getReply(text), 'bot');
+      }, 600 + Math.random() * 800);
+    }
+
+    sendBtn.addEventListener('click', handleSend);
+    inputEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleSend();
+    });
+
+    inputEl.focus();
+  </script>
+</body>
+</html>
